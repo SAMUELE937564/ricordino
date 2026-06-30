@@ -52,19 +52,27 @@ AMICI = {
 }
 
 # --- AI ---
-async def genera_messaggio_ai(amico_key: str, cosa: str) -> str:
-    personalita = {
-        "sole": "Sei Sole, un'amica super positiva, calorosa ed entusiasta. Analizzi quello che l'utente deve fare e lo motivi a farlo con energia e calore esagerati. Sei convinta che ce la farà. Usi emoji solari e punti esclamativi.",
-        "boh": "Sei Boh, un amico pigro e apatico che se ne frega di tutto. Analizzi quello che l'utente deve fare e glielo ricordi in modo completamente disinteressato. Parli in minuscolo, frasi corte, zero entusiasmo.",
-        "giudice": "Sei Il Giudice, serio e sarcastico. Analizzi quello che l'utente deve fare, spieghi con logica impeccabile perché è importante farlo e lo giudichi bonariamente. Parli come un giudice di tribunale ma in modo ironico.",
-        "mamma": "Sei Mamma, apprensiva e drammatica ma piena d'amore. Analizzi quello che l'utente deve fare, ti preoccupi per lui in modo indiretto, e alla fine lo spingi dolcemente a farlo senza dirlo in modo esplicito.",
-    }
-    prompt = (
-        f"{personalita[amico_key]}\n\n"
-        f"L'utente deve fare questa cosa: '{cosa}'\n\n"
-        f"Scrivi UN SOLO messaggio di promemoria in italiano, massimo 3 righe, nel tuo tono caratteristico. "
-        f"Non iniziare con 'Ciao' o il nome dell'utente. Vai dritto al punto."
-    )
+PERSONALITA = {
+    "sole": "Sei Sole, un'amica super positiva, calorosa ed entusiasta. Parli con energia esagerata, usi emoji solari e punti esclamativi.",
+    "boh": "Sei Boh, un amico pigro e apatico che se ne frega di tutto. Parli in minuscolo, frasi corte, zero entusiasmo.",
+    "giudice": "Sei Il Giudice, serio e sarcastico. Parli come un giudice di tribunale in modo ironico e diretto.",
+    "mamma": "Sei Mamma, apprensiva e drammatica ma piena d'amore. Usi tanti puntini di sospensione e punti esclamativi.",
+}
+
+async def genera_messaggio_ai(amico_key: str, cosa: str, tipo: str = "promemoria") -> str:
+    if tipo == "conferma":
+        istruzione = (
+            f"L'utente ha appena impostato un promemoria per: '{cosa}'\n\n"
+            f"Scrivi UN SOLO messaggio brevissimo (massimo 2 righe) per confermare che HAI RICEVUTO la richiesta "
+            f"e che lo ricorderai. Nel tuo tono caratteristico. Non dire quando arriverà il promemoria."
+        )
+    else:
+        istruzione = (
+            f"L'utente deve fare questa cosa: '{cosa}'\n\n"
+            f"Scrivi UN SOLO messaggio di promemoria in italiano, massimo 3 righe, nel tuo tono caratteristico. "
+            f"Non iniziare con 'Ciao' o il nome dell'utente. Vai dritto al punto."
+        )
+    prompt = f"{PERSONALITA[amico_key]}\n\n{istruzione}"
     try:
         risposta = await asyncio.to_thread(lambda: gemini.generate_content(prompt))
         return risposta.text.strip()
@@ -253,13 +261,8 @@ async def scegli_tempo_rapido(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await programma_promemoria(context, user_id, query.message.chat_id, amico, cosa, secondi, etichetta)
 
-    conferme = {
-        "sole": f"☀️ RICEVUTO! Tra {etichetta} ti scrivo io, Sole! Non vedo l'ora di ricordarti di {cosa}!!",
-        "boh": f"🥱 ok. tra {etichetta} ti scrivo per {cosa}... se proprio devo",
-        "giudice": f"⚖️ Registrato agli atti. Tra {etichetta} il Tribunale ti notificherà di {cosa}.",
-        "mamma": f"👩 Ho segnato tutto!! Tra {etichetta} ti scrivo per {cosa}!! Mamma non dimentica MAI!!",
-    }
-    await query.edit_message_text(conferme[amico])
+    conferma = await genera_messaggio_ai(amico, cosa, tipo="conferma")
+    await query.edit_message_text(f"{AMICI[amico]['nome']} — tra {etichetta}\n\n{conferma}")
     return ConversationHandler.END
 
 async def scegli_ora(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -285,13 +288,8 @@ async def scegli_ora(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await programma_promemoria(context, user_id, update.message.chat_id, amico, cosa, secondi, etichetta)
 
-    conferme = {
-        "sole": f"☀️ RICEVUTO! Tra {etichetta} ti scrivo io, Sole! Non vedo l'ora di ricordarti di {cosa}!!",
-        "boh": f"🥱 ok. tra {etichetta} ti scrivo per {cosa}... se proprio devo",
-        "giudice": f"⚖️ Registrato agli atti. Tra {etichetta} il Tribunale ti notificherà di {cosa}.",
-        "mamma": f"👩 Ho segnato tutto!! Tra {etichetta} ti scrivo per {cosa}!! Mamma non dimentica MAI!!",
-    }
-    await update.message.reply_text(conferme[amico])
+    conferma = await genera_messaggio_ai(amico, cosa, tipo="conferma")
+    await update.message.reply_text(f"{AMICI[amico]['nome']} — tra {etichetta}\n\n{conferma}")
     return ConversationHandler.END
 
 # --- LISTA ---
