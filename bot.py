@@ -1,14 +1,13 @@
 import logging
 import asyncio
 import os
+import random
 import uuid
 import time
 from datetime import datetime, timedelta
 import pytz
 from dotenv import load_dotenv
 from tinydb import TinyDB, Query
-from google import genai
-from google.genai import types as genai_types
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -18,8 +17,6 @@ from telegram.ext import (
 # --- CONFIGURAZIONE ---
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-gemini = genai.Client(api_key=GEMINI_API_KEY)
 FUSO_ITALIA = pytz.timezone("Europe/Rome")
 
 # --- DATABASE ---
@@ -40,6 +37,105 @@ AMICI = {
     "boh": {"nome": "🥱 Boh", "descrizione": "Se ne frega, ma ti ricorda lo stesso...", "fallback": "boh... {cosa}... fai te"},
     "giudice": {"nome": "⚖️ Il Giudice", "descrizione": "Sarcastico e spietato.", "fallback": "Ascolta. {cosa}. Fallo."},
     "mamma": {"nome": "👩 Mamma", "descrizione": "Drammatica, apprensiva, ti ama troppo.", "fallback": "Tesoro... {cosa}... mamma ci pensa..."},
+}
+
+MESSAGGI = {
+    "sole": {
+        "promemoria": [
+            "☀️ EHI EHI EHI!! Sono qui, la tua Sole preferita, e indovina un po'?? È arrivato il momento di {cosa}!! Lo so che magari non hai voglia, ma ascoltami — ogni volta che fai le cose che devi fare diventi una versione migliore di te. E tu meriti solo il meglio!! VAI VAI VAI!! 💪✨",
+            "🌟 ATTENZIONE MESSAGGIO URGENTE DA SOLE!! Devi fare {cosa} e lo devi fare ADESSO!! Non domani, non tra un po' — ora!! Perché? Perché il futuro-te ti sta già ringraziando dall'altra parte del tempo!! Forza amore, ce la fai, lo so meglio di te!! ☀️💛",
+            "☀️ Ciao tesoro!! Sole qui, la tua cheerleader personale!! Volevo solo ricordarti con tutto l'amore del mondo che {cosa} ti sta aspettando!! Non è un peso, è un'opportunità!! Ogni cosa che fai oggi costruisce la persona fantastica che sei!! Dai dai dai!! 🎉",
+            "💫 Hey tu!! Sì, proprio tu!! Sole ti vede e sa che hai tutto quello che serve per fare {cosa} adesso!! Non rimandare perché sai già come finisce — e finisce con te scocciato/a di te stesso/a!! Invece immagina come ti senti dopo!! BENISSIMO!! Andiamo!! 🚀☀️",
+            "🌈 BUONGIORNOOOO o buonaseraaa o qualunque ora sia!! Sole è qui a ricordarti che {cosa} non si fa da sola!! Ma tu sì che puoi farlo!! Sei una persona straordinaria e le persone straordinarie fanno le cose anche quando non hanno voglia!! Forza campione/essa!! ☀️🏆",
+            "⭐ Psst!! Sono Sole!! Ti sto guardando con tutta la mia energia positiva puntata su di te!! E sai cosa vedo? Vedo qualcuno che sta per fare {cosa} e che dopo si sentirà BENISSIMO!! Fidati di me, fidati di te — ora muoviti!! Ti voglio tanto bene!! ☀️💕",
+            "☀️ RICORDINO DI SOLE SPECIALE EDIZIONE LIMITATA!! {cosa} — tre parole (più o meno) che cambieranno la tua giornata!! Lo so che hai mille cose per la testa ma questa è importante!! Respira, sorridi, e falla!! Io sono qui a fare il tifo per te a distanza!! 📣💛",
+            "🌟 Hey campione/essa della vita!! Sole qui con un aggiornamento importantissimo: {cosa} è ancora lì che ti aspetta con pazienza!! E sai cosa? La pazienza ha un limite!! Scherzo — ma non scherzo sul fatto che dovresti farlo adesso!! Sei pronto/a? SÌ CHE LO SEI!! ☀️",
+            "💛 Ciao bellissimo/a!! Ogni tanto Sole si ferma e pensa — ma quella persona fantastica che conosco sta facendo tutto quello che deve? E poi mi ricordo di {cosa} e ti scrivo subito!! Non perché ti giudico, ma perché ci tengo davvero tanto a te!! Forza su!! 🌈✨",
+            "☀️ ALLARME POSITIVO!! ALLARME POSITIVO!! Non è un'emergenza — è meglio!! È il momento perfetto per fare {cosa}!! Il momento perfetto non esiste? SBAGLIATO!! Il momento perfetto è ADESSO con tutta la buona energia che ti sto mandando!! Vai vai vai!! 💪🌟",
+            "🎯 Sole qui!! Ho fatto due calcoli e ho capito che se fai {cosa} adesso, dopo avrai il resto della giornata/sera libera con la soddisfazione nel cuore!! Sembra un buon piano no?? A me sembra il piano migliore del mondo!! Fidati della tua Sole!! ☀️💫",
+            "💕 Ehi tu splendida persona!! Ti scrivo perché mi hai chiesto di ricordarti {cosa} e io non mi dimentico MAI di te!! Come stai? Spero bene!! In ogni caso — fai questa cosa, poi dimmi come va!! Sono curiosissima!! Forza tesoro, ce la fai alla grande!! ☀️🌈",
+            "🌟 MESSAGGIO DA SOLE — PRIORITÀ MASSIMA!! {cosa} è in attesa di essere completata e l'unica persona al mondo capace di farlo sei TU!! Non è una responsabilità, è un superpotere!! Usa il tuo superpotere adesso!! Il mondo (o almeno io) ti applaude!! ☀️👏",
+            "☀️ Ehi!! Sai quella sensazione bellissima quando completi qualcosa che dovevi fare? Ecco, tra poco puoi averla!! Basta fare {cosa} — e poi quella sensazione è tutta tua!! Gratis!! Offerta da Sole con amore sconfinato!! Dai che ce la fai amico/a mio/a!! 💛✨",
+            "💫 Ultimo avviso da Sole (non è vero, ti scrivo sempre)!! {cosa} ti sta aspettando e io ti sto aspettando dall'altra parte con un abbraccio virtuale enorme!! Falla e poi festeggiamo!! Cosa festeggiamo? TUTTO!! Perché sei incredibile e meriti di festeggiare!! ☀️🎉",
+        ],
+        "conferma": [
+            "☀️ RICEVUTO CON TUTTO IL CUORE!! Ho segnato {cosa} e non vedo l'ora di ricordartelo!! Preparati a ricevere la dose massima di energia positiva quando arriverà il momento!! Sei in buone mani — le mie!! 💛",
+            "🌟 Annotato annotato annotato!! {cosa} è nella mia lista VIP e quando sarà il momento ti scrivo con tutta l'energia che ho!! Che è tanta, fidati!! ☀️",
+            "💫 Ho capito tutto!! {cosa} — ci penso io!! Rilassati e quando arriva il momento vedrai che messaggio ti mando!! Spoiler: sarà bellissimo e ti caricherà tantissimo!! ☀️🎉",
+        ],
+    },
+    "boh": {
+        "promemoria": [
+            "boh... dovresti fare {cosa}... o almeno così mi hai detto... fai te comunque, non è che mi cambia la vita sapere se lo fai o no. però l'hai scritto. quindi immagino che ti importasse. mah.",
+            "{cosa}. esiste questa roba. tu devi farla. io te lo sto dicendo. fine. non so cos'altro aggiungere davvero.",
+            "eh... {cosa}... ci siamo. il momento è questo. o questo o dopo ma poi dimentichi e poi ti arrabbi. boh, fai come vuoi. io ho fatto la mia parte.",
+            "sveglia. {cosa}. lo so che non hai voglia. neanch'io ho voglia di scriverti ma eccoci qua. entrambi a fare cose che non vogliamo fare. solidarietà.",
+            "{cosa}... sì... quella cosa lì... ancora da fare... ti ricordo perché me lo hai chiesto tu altrimenti onestamente chi se ne frega. comunque. falla.",
+            "ok quindi. {cosa}. questo era il promemoria. non ho molto altro da dire al riguardo. potevo scrivere di più ma a che serve. falla o non farla, vita tua.",
+            "ciao. {cosa}. è ancora lì. immobile. ad aspettarti. un po' triste se ci pensi. boh. vabbè. pensaci tu.",
+            "riecco qua. {cosa}. lo so, lo so. non è il momento ideale. non esiste mai il momento ideale però. quindi tanto vale adesso. o no. boh.",
+            "ti scrivo perché devo farlo. {cosa}. eccolo. il promemoria. spero tu lo faccia ma non ci scommetterei. comunque ci ho provato. posso andare?",
+            "hey. {cosa}. ancora lì in attesa. come me che aspetto che tu lo faccia. siamo in due. almeno hai compagnia.",
+            "boh guarda non so come dirtelo in modo diverso quindi te lo ridico uguale: {cosa}. ecco. detto. ora tocca a te.",
+            "{cosa}. importante? dipende da te. urgente? tu mi dirai. io so solo che me lo hai chiesto di ricordartelo e l'ho fatto. prego. immagino.",
+            "sai quella cosa che dovevi fare? {cosa}? eccola. è qui. ti aspetta. con pazienza. più pazienza di quanta ne abbia io a scriverti questi messaggi.",
+            "ok allora. {cosa}. esiste. tu esisti. in teoria potreste incontrarvi. in pratica fai tu. io mi tiro fuori dalla questione.",
+            "ultimo messaggio della serata o della mattina o del pomeriggio boh. {cosa}. falla. non farla. ma probabilmente dovresti farla. ciao.",
+        ],
+        "conferma": [
+            "ok. {cosa}. ho capito. ti scrivo quando è il momento. non aspettarti grandi cose.",
+            "annotato. {cosa}. ci penso io. nel senso che me lo ricordo io per te. non è che mi entusiasma ma vabbè.",
+            "sì sì. {cosa}. l'ho segnato. ti avviso dopo. non sarà un gran messaggio ma almeno arriva.",
+        ],
+    },
+    "giudice": {
+        "promemoria": [
+            "⚖️ Il Tribunale della Produttività è in sessione. Imputato/a: te. Accusa: aver inserito '{cosa}' come promemoria, il che implica consapevolezza dell'obbligo. Sentenza provvisoria: fallo adesso. Chi rimanda sa già come va a finire — e non bene. Il Giudice ha parlato.",
+            "⚖️ Attenzione. Il Giudice ha esaminato il tuo fascicolo e rileva che {cosa} è ancora in sospeso. Le prove sono schiaccianti: lo sapevi, l'hai annotato, hai accettato questo servizio. Non ci sono attenuanti. La condanna è una sola: agisci immediatamente.",
+            "⚖️ Sentenza numero 47 del Tribunale dei Promemoria: {cosa} non è negoziabile. Non è una proposta. Non è un suggerimento. È un verdetto emesso da te stesso/a nel momento in cui hai premuto invio. Il Giudice si aspetta esecuzione immediata della sentenza.",
+            "⚖️ Il Giudice prende atto che {cosa} attende ancora. Questo non è un buon segno per la tua reputazione davanti alla corte. Tuttavia c'è ancora tempo per rimediare — fallo adesso e il Giudice potrebbe considerare circostanze attenuanti. Forse.",
+            "⚖️ Udienza straordinaria. Motivo: {cosa} non risulta completata. Il Giudice fa notare che ogni minuto di ritardo si trasforma in senso di colpa, perdita di efficienza e, nel lungo periodo, rimpianto. La soluzione è semplice ed è nelle tue mani. Eseguire.",
+            "⚖️ Deposizione del Giudice: chi ha inserito {cosa} come promemoria era evidentemente una persona lucida e responsabile. Chi sta leggendo questo messaggio deve onorare quella decisione. Sii la persona che eri quando hai scritto quella cosa. Agisci.",
+            "⚖️ Caso numero 112 — {cosa} versus procrastinazione. Il Giudice ha deliberato: vince {cosa}. Motivazione: perché te l'eri promesso, perché è nell'interesse dell'imputato/a, e perché il Giudice non tollera l'indolenza. Esecuzione immediata richiesta.",
+            "⚖️ Il Giudice si trova nella scomoda posizione di dover ribadire l'ovvio: {cosa} deve essere fatto. Non perché il Giudice lo imponga — ma perché tu stesso/a lo hai deciso. Rispetta le tue decisioni. È la base di qualsiasi cosa nella vita.",
+            "⚖️ Avviso solenne: {cosa} è in attesa di esecuzione. Il Giudice non emette sentenze per divertimento — le emette perché qualcuno ha riconosciuto un bisogno e ha chiesto aiuto. Ecco l'aiuto. Ora la parte difficile tocca a te.",
+            "⚖️ Il Giudice ha analizzato la situazione e conclude quanto segue: rimandare {cosa} non la fa sparire. La fa crescere. Diventa più pesante, più ingombrante, più scomoda. La soluzione ottimale — come il Giudice sa benissimo — è agire subito. Procedere.",
+            "⚖️ Verbale d'udienza: {cosa} — ancora irrisolta. Il Giudice nota con disappunto che la tendenza a rimandare è un vizio comune ma non per questo accettabile. La corte si aspetta un cambio di comportamento immediato. La corte ha fiducia in te. Non deluderla.",
+            "⚖️ Il Giudice parla chiaro: hai chiesto di essere ricordato/a di {cosa}. Questo significa che una parte di te sa che è importante. Ascolta quella parte. È la più saggia. Fallo adesso — e il Giudice sarà costretto ad assolvere con formula piena.",
+            "⚖️ Sentenza definitiva sul caso {cosa}: colpevole di non averla ancora fatta, ma con possibilità di riabilitazione immediata. La riabilitazione avviene in un solo modo: azione. Nessun ricorso è ammesso. Il Giudice attende notizie positive.",
+            "⚖️ Il Giudice nota che esiste una correlazione diretta tra il fare {cosa} adesso e il sentirti meglio dopo. È matematica. È logica. È inconfutabile. Chi siamo noi per sfidare la matematica? Nessuno. Quindi vai.",
+            "⚖️ Chiusura dell'udienza odierna: {cosa} deve essere completata prima che questo Tribunale si riunisca di nuovo. Il Giudice ha emesso il suo verdetto. Ora tocca alla difesa — cioè a te — dimostrare di essere all'altezza della sentenza. Il Giudice crede in te. Non farlo pentire.",
+        ],
+        "conferma": [
+            "⚖️ Il Tribunale ha preso nota. {cosa} è registrata agli atti ufficiali. Al momento stabilito il Giudice ti notificherà con tutto il peso dell'autorità che gli compete.",
+            "⚖️ Ricevuto e protocollato. {cosa} — caso aperto. Il Giudice ti contatterà a tempo debito. Preparati a ricevere una sentenza inappellabile.",
+            "⚖️ Registrato. {cosa} entra nel fascicolo. Il Giudice non dimentica. Non perdona i ritardi. Ma soprattutto — arriva sempre.",
+        ],
+    },
+    "mamma": {
+        "promemoria": [
+            "👩 Tesoro mio... sai che mamma pensa sempre a te, vero? Stavo facendo le mie cose e a un certo punto mi è venuto in mente {cosa}... e ho sentito subito quel peso qui, al petto, che sento quando so che c'è qualcosa di importante in sospeso. Fallo dai, amore. Per mamma. Che poi dorme meglio.",
+            "👩 Amore!! Mamma qui!! Non dormo tranquilla sapendo che {cosa} non è ancora fatto... non è che mi vuoi fare del male apposta vero? No dai, scherzo. O forse no. Comunque — fallo su, che poi mamma sta meglio e anche tu stai meglio. Funziona sempre così.",
+            "👩 Caro/a figlio/a mio/a... mamma non vuole essere quella che rompe sempre... però {cosa}... sai com'è... mamma lo sa quando una cosa è importante anche se non lo dice... e questa lo è. Falla quando puoi. Anzi, falla adesso. Mamma ti guarda. Con amore, eh. Solo con amore.",
+            "👩 Sai cosa ho fatto oggi? Ho pensato a te. Come sempre. E poi ho pensato a {cosa} e mi sono chiesta se l'avevi fatto... e la risposta era no... lo sentivo. Mamma sente queste cose. Non so spiegarlo ma è così. Fallo adesso tesoro che poi ti sento più leggero/a. Promesso.",
+            "👩 Eccomi qui, la tua mamma preferita!! Volevo solo... beh... ricordarti di {cosa}... in modo carino... senza pressioni... anche se sai che quando dico senza pressioni poi in realtà... vabbè. Fallo. Ti voglio bene. Tantissimo. Anche se non lo fai. Ma fallo lo stesso.",
+            "👩 Tesoro... mamma ha avuto una giornata così così... però poi mi sono ricordata di te e già stavo meglio... e poi mi sono ricordata di {cosa} e ho pensato 'speriamo che ci abbia pensato'... e poi ho pensato 'meglio scrivergli/le per sicurezza'... eccomi. Con tutto il mio amore.",
+            "👩 Ciao amore mio!! Mamma qui a portare calore e affetto e anche a ricordarti che {cosa} esiste ancora!! Non te la mando come un rimprovero eh — te la mando come un abbraccio con un promemoria dentro. Come uno di quei bigliettini che ti mettevo nello zaino. Ti ricordi?",
+            "👩 Figlio/a mio/a adorato/a... so che sei grande e sai fare tutto da solo/a... però ogni tanto mamma ha bisogno di sentirsi utile... quindi ti ricordo {cosa}... non perché non ti fidi di te... ma perché voglio esserci. Sempre. Anche per le piccole cose. Ti amo.",
+            "👩 Tesoro!! Ho guardato il telefono e ho visto che dovevo ricordarti {cosa} e ho detto 'grazie al cielo che esiste questo bot sennò chissà'... comunque. La cosa. Quella lì. Quando puoi. Anzi, adesso. Mamma aspetta. Non in modo ansioso. Ok, forse un po'.",
+            "👩 Sai quelle mamme che non rompono mai? Io non sono quella lì. Io sono quella che ti vuole bene così tanto da rompere quando serve. E adesso serve. {cosa}, amore mio. Quando hai un momento. Che poi mamma è tranquilla e tu sei tranquillo/a. Win win come dicono i giovani.",
+            "👩 Amor mio... mamma non vuole disturbare... però quel pensiero lì... {cosa}... non mi lascia stare... è come quando lasci la finestra aperta d'inverno che sai che non va bene ma non la chiudi subito... chiudi la finestra tesoro. Nel senso: fai la cosa.",
+            "👩 Eccomi!! Tua mamma!! Con tutto l'amore del mondo e anche con {cosa} in mano che ti porgo con delicatezza!! Non è un rimprovero, è un servizio!! Un servizio d'amore!! Fatto con il cuore!! Da qualcuno che pensa a te ogni singolo giorno!! Falla su!!",
+            "👩 Tesoro... stavo pensando... se non fai {cosa} poi ti pesa... e se ti pesa a te pesa anche a mamma... e noi non vogliamo che pesi a mamma vero? Quindi la soluzione è semplice. Falla. E poi dimmi com'è andata. Non adesso, quando vuoi. Anche adesso va bene.",
+            "👩 Ciao amore!! Sai che mamma non dorme mai benissimo... stanotte mi sono svegliata e ho pensato a {cosa}... non so perché il cervello fa queste cose di notte ma succede... comunque. Adesso che sei sveglio/a anche tu — falla. Così mamma può dormire meglio stanotte. Prego.",
+            "👩 Figlio/a mio/a della vita mia... {cosa}... te lo dico con tutto l'amore che ho... che è tanto, lo sai... falla adesso che poi sei libero/a e mamma è felice e il mondo è un posto migliore. Ok forse esagero. Ma solo un po'. Ti voglio un bene dell'anima.",
+        ],
+        "conferma": [
+            "👩 Amore!! Ho segnato tutto!! {cosa} — mamma non dimentica MAI le cose importanti!! Ti scrivo quando è il momento, con tutto l'affetto che ho!!",
+            "👩 Ricevuto tesoro!! {cosa} è qui con me al sicuro!! Quando sarà l'ora ti faccio sapere!! Con amore sconfinato, mamma!!",
+            "👩 Ho capito tutto caro/a!! {cosa} — ci pensa mamma!! Rilassati che ci sono io!! Come sempre!! Ti voglio bene!!",
+        ],
+    },
 }
 
 PERSONALITA = {
@@ -72,39 +168,10 @@ PERSONALITA = {
 
 GIORNI = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
 
-# --- AI ---
+# --- MESSAGGI ---
 async def genera_messaggio_ai(amico_key: str, cosa: str, tipo: str = "promemoria") -> str:
-    if tipo == "conferma":
-        istruzione = (
-            f"L'utente ha appena impostato un promemoria per: '{cosa}'. "
-            f"Scrivi un messaggio di conferma in italiano di 3-4 righe nel tuo tono caratteristico. "
-            f"Fai capire che hai recepito esattamente cosa deve fare, e anticipagli già il tuo stile "
-            f"di come glielo ricorderai. Non dire quando arriverà il promemoria."
-        )
-    else:
-        istruzione = (
-            f"L'utente deve fare questa cosa: '{cosa}'. "
-            f"Scrivi un messaggio di promemoria in italiano di 4-6 righe nel tuo tono caratteristico. "
-            f"Analizza la cosa che deve fare, motivalo o giudicalo nel tuo stile, "
-            f"e spingi l'utente ad agire adesso. Rendilo memorabile, divertente e unico. "
-            f"Non iniziare con 'Ciao' o con il nome dell'utente."
-        )
-    try:
-        config = genai_types.GenerateContentConfig(
-            max_output_tokens=500,
-            temperature=0.95,
-        )
-        risposta = await asyncio.to_thread(
-            lambda: gemini.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=f"{PERSONALITA[amico_key]}\n\n{istruzione}",
-                config=config,
-            )
-        )
-        return risposta.text.strip()
-    except Exception as e:
-        print(f"Errore Gemini: {e}")
-        return AMICI[amico_key]["fallback"].format(cosa=cosa)
+    template = random.choice(MESSAGGI[amico_key][tipo])
+    return template.format(cosa=cosa)
 
 # --- STATISTICHE ---
 def aggiorna_stats(user_id: int, amico: str, completato: bool = None):
