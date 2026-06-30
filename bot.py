@@ -90,7 +90,13 @@ async def genera_messaggio_ai(amico_key: str, cosa: str, tipo: str = "promemoria
             f"Non iniziare con 'Ciao' o con il nome dell'utente."
         )
     try:
-        risposta = await asyncio.to_thread(lambda: gemini.generate_content(f"{PERSONALITA[amico_key]}\n\n{istruzione}"))
+        config = genai.types.GenerationConfig(
+            max_output_tokens=400,
+            temperature=0.95,
+        )
+        risposta = await asyncio.to_thread(
+            lambda: gemini.generate_content(f"{PERSONALITA[amico_key]}\n\n{istruzione}", generation_config=config)
+        )
         return risposta.text.strip()
     except Exception:
         return AMICI[amico_key]["fallback"].format(cosa=cosa)
