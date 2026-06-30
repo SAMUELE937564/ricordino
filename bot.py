@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 import pytz
 from dotenv import load_dotenv
 from tinydb import TinyDB, Query
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -18,8 +19,7 @@ from telegram.ext import (
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
-gemini = genai.GenerativeModel("gemini-1.5-flash")
+gemini = genai.Client(api_key=GEMINI_API_KEY)
 FUSO_ITALIA = pytz.timezone("Europe/Rome")
 
 # --- DATABASE ---
@@ -90,15 +90,20 @@ async def genera_messaggio_ai(amico_key: str, cosa: str, tipo: str = "promemoria
             f"Non iniziare con 'Ciao' o con il nome dell'utente."
         )
     try:
-        config = genai.types.GenerationConfig(
-            max_output_tokens=400,
+        config = genai_types.GenerateContentConfig(
+            max_output_tokens=500,
             temperature=0.95,
         )
         risposta = await asyncio.to_thread(
-            lambda: gemini.generate_content(f"{PERSONALITA[amico_key]}\n\n{istruzione}", generation_config=config)
+            lambda: gemini.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=f"{PERSONALITA[amico_key]}\n\n{istruzione}",
+                config=config,
+            )
         )
         return risposta.text.strip()
-    except Exception:
+    except Exception as e:
+        print(f"Errore Gemini: {e}")
         return AMICI[amico_key]["fallback"].format(cosa=cosa)
 
 # --- STATISTICHE ---

@@ -1,5 +1,5 @@
 python-telegram-bot[job-queue]
-google-generativeai
+google-genai
 tinydb
 python-dotenv
 pytz
